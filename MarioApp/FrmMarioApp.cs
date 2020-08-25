@@ -4,6 +4,10 @@ using System.Data.OleDb;
 using ADODB;
 using System.Windows.Forms;
 using QRCoder;
+using AForge.Video.DirectShow;
+using AForge.Video;
+using System.Drawing;
+using ZXing;
 
 namespace MarioApp
 {
@@ -48,10 +52,13 @@ namespace MarioApp
 
         List<VsoftCustomer> customers = new List<VsoftCustomer>();
 
+        FilterInfoCollection filterInfoCollection;
+        VideoCaptureDevice videoCaptureDevice;
+
         public FrmMarioApp()
         {
             InitializeComponent();
-            UpdateBinding();
+            UpdateBinding();            
         }
 
         private void UpdateBinding()
@@ -62,6 +69,22 @@ namespace MarioApp
 
         private void FrmMarioApp_Load(object sender, EventArgs e)
         {
+            try            
+            {
+                filterInfoCollection = new FilterInfoCollection(FilterCategory.VideoInputDevice);
+                foreach (FilterInfo device in filterInfoCollection)
+                    cboCamera.Items.Add(device.Name);
+                cboCamera.SelectedIndex = 0;
+            }
+            catch (Exception)
+            {
+                // throw;
+                btnStartScan.Enabled = false;
+                btnStopScan.Enabled = false;
+                cboCamera.Items.Add("No webcam detected");
+                cboCamera.SelectedIndex = 0;
+            }                                 
+
             Text = "Mario";
             tbMarLocatie.Text = Properties.Settings.Default.MdvSetting;
             tbLocalConnectionstring.Text = Properties.Settings.Default.LocalSQLSetting;
@@ -529,7 +552,7 @@ namespace MarioApp
             }
         }
 
-        private void btnGenerate_Click(object sender, EventArgs e)
+        private void BtnGenerate_Click(object sender, EventArgs e)
         {            
             QRCodeGenerator qr = new QRCodeGenerator();
             QRCodeData data = qr.CreateQrCode(txtQRCode.Text, QRCodeGenerator.ECCLevel.Q);
@@ -537,7 +560,7 @@ namespace MarioApp
             pic.Image = code.GetGraphic(5);
         }
 
-        private void btnDemoContent_Click(object sender, EventArgs e)
+        private void BtnDemoContent_Click(object sender, EventArgs e)
         {
             string serviceTagValue = "BCD\n";
             string versionValue = "001\n";
@@ -554,6 +577,54 @@ namespace MarioApp
 
             string qrTMP = serviceTagValue + versionValue + charactersetValue + identificationValue + bicValue + nameValue + ibanValue + amountValue + purposeValue + referenceValue + remittanceValue + informationValue;
             txtQRCode.Text = qrTMP;
+        }
+
+        private void BtnStart_Click(object sender, EventArgs e)
+        {
+            videoCaptureDevice = new VideoCaptureDevice(filterInfoCollection[cboCamera.SelectedIndex].MonikerString);
+            videoCaptureDevice.NewFrame += VideoCaptureDevice_NewFrame;
+            videoCaptureDevice.Start();
+        }
+
+        private void VideoCaptureDevice_NewFrame(object sender, AForge.Video.NewFrameEventArgs eventArgs)
+        {
+            Bitmap bitmap = (Bitmap)eventArgs.Frame.Clone();
+            BarcodeReader reader = new BarcodeReader();
+            try
+            {                
+                var result = reader.Decode(bitmap);
+                if (result != null)
+                {
+                    txtBarcode.Invoke(new MethodInvoker(delegate ()
+                    {
+                        txtBarcode.Text = result.ToString();
+                    }));
+                }
+                pictureBox.Image = bitmap;                
+            }
+            catch (Exception ex)
+            {
+                // throw; 
+                txtBarcode.Text = ex.Message;
+            }           
+        }
+
+        private void FrmMarioApp_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            if(videoCaptureDevice != null)
+            {
+                if (videoCaptureDevice.IsRunning)
+                    videoCaptureDevice.Stop();
+            }
+        }
+
+        private void BtnStopScan_Click(object sender, EventArgs e)
+        {
+            if (videoCaptureDevice != null)
+            {
+                if (videoCaptureDevice.IsRunning)
+                    videoCaptureDevice.Stop();
+            }
         }
     }
 }
