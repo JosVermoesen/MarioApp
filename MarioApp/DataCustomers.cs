@@ -159,7 +159,7 @@ namespace MarioApp
                     {
                         customersUpdate.Add(new VsoftCustomer
                         {                            
-                            Id = (string)readerUpdate["A110"],
+                            Id = (string)readerUpdate["A110"].ToString().Trim(' '),
                             V301 = readerUpdate["V301"].ToString().Trim(' '),
                             V302 = readerUpdate["V302"].ToString().Trim(' '),
                             E072 = readerUpdate["E072"].ToString().Trim(' '),
